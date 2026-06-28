@@ -71,6 +71,24 @@ const getAnchorAndDir = (
     }
 };
 
+interface LightRaysUniforms {
+    iTime: { value: number };
+    iResolution: { value: [number, number] };
+    rayPos: { value: [number, number] };
+    rayDir: { value: [number, number] };
+    raysColor: { value: [number, number, number] };
+    raysSpeed: { value: number };
+    lightSpread: { value: number };
+    rayLength: { value: number };
+    pulsating: { value: number };
+    fadeDistance: { value: number };
+    saturation: { value: number };
+    mousePos: { value: [number, number] };
+    mouseInfluence: { value: number };
+    noiseAmount: { value: number };
+    distortion: { value: number };
+}
+
 const LightRays: React.FC<LightRaysProps> = ({
                                                  raysOrigin = "top-center",
                                                  raysColor = DEFAULT_COLOR,
@@ -87,12 +105,12 @@ const LightRays: React.FC<LightRaysProps> = ({
                                                  className = "",
                                              }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const uniformsRef = useRef<any>(null);
+    const uniformsRef = useRef<LightRaysUniforms | null>(null);
     const rendererRef = useRef<Renderer | null>(null);
     const mouseRef = useRef({ x: 0.5, y: 0.5 });
     const smoothMouseRef = useRef({ x: 0.5, y: 0.5 });
     const animationIdRef = useRef<number | null>(null);
-    const meshRef = useRef<any>(null);
+    const meshRef = useRef<Mesh | null>(null);
     const cleanupFunctionRef = useRef<(() => void) | null>(null);
     const [isVisible, setIsVisible] = useState(false);
     const observerRef = useRef<IntersectionObserver | null>(null);
@@ -250,10 +268,9 @@ void main() {
   gl_FragColor  = color;
 }`;
 
-            const uniforms = {
+            const uniforms: LightRaysUniforms = {
                 iTime: { value: 0 },
                 iResolution: { value: [1, 1] },
-
                 rayPos: { value: [0, 0] },
                 rayDir: { value: [0, 1] },
 
