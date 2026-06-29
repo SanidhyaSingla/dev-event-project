@@ -55,13 +55,34 @@ function generateSlug(title: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/** Validate a date string in ISO format (YYYY-MM-DD). */
+function validateDate(date: string): boolean {
+  const trimmed = date.trim();
+
+  if (!ISO_DATE_REGEX.test(trimmed)) {
+    return false;
+  }
+
+  const [year, month, day] = trimmed.split("-").map(Number);
+
+  // Basic date validation
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return false;
+  }
+
+  // Additional validation: check for invalid dates like Feb 30
+  const date_obj = new Date(`${trimmed}T00:00:00.000Z`);
+  const isoString = date_obj.toISOString().split("T")[0];
+
+  return isoString === trimmed;
+}
+
 /** Normalize a date string to ISO format (YYYY-MM-DD). */
 function normalizeDate(date: string): string {
   const trimmed = date.trim();
 
   if (ISO_DATE_REGEX.test(trimmed)) {
-    const parsed = new Date(`${trimmed}T00:00:00.000Z`);
-    if (Number.isNaN(parsed.getTime())) {
+    if (!validateDate(trimmed)) {
       throw new Error("Date must be a valid ISO date (YYYY-MM-DD).");
     }
 
@@ -107,7 +128,14 @@ function normalizeTime(time: string): string {
 const eventSchema = new Schema<IEvent, EventModel>(
   {
     title: { type: String, required: true, trim: true },
-    slug: { type: String, trim: true },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+      sparse: true,
+    },
     description: { type: String, required: true, trim: true },
     overview: { type: String, required: true, trim: true },
     image: { type: String, required: true, trim: true },
@@ -127,7 +155,7 @@ const eventSchema = new Schema<IEvent, EventModel>(
 // Enforce fast lookups and uniqueness for event URLs.
 eventSchema.index({ slug: 1 }, { unique: true });
 
-eventSchema.pre("save", function () {
+eventSchema.pre("save", async function () {
   for (const field of REQUIRED_STRING_FIELDS) {
     const value = this.get(field);
 
@@ -155,9 +183,25 @@ eventSchema.pre("save", function () {
     );
   }
 
-  // Regenerate slug only when the title changes to keep existing URLs stable.
-  if (this.isModified("title")) {
-    this.set("slug", generateSlug(this.title));
+  // Generate slug on creation or update title
+  if (this.isNew || this.isModified("title")) {
+    const newSlug = generateSlug(this.title);
+
+    // Check for slug collision on updates to prevent duplicates
+    if (!this.isNew || newSlug !== this.slug) {
+      const existing = await Event.findOne({
+        slug: newSlug,
+        _id: { $ne: this._id },
+      });
+
+      if (existing) {
+        throw new Error(
+          `Slug "${newSlug}" already exists. Choose a different title.`,
+        );
+      }
+    }
+
+    this.set("slug", newSlug);
   }
 
   if (this.isModified("date")) {

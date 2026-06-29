@@ -1,2 +1,2 @@
-export { Event } from "./event.model";
-export { Booking } from "./booking.model";
+export { Event, type IEvent, type EventDocument } from "./event.model";
+export { Booking, type IBooking, type BookingDocument } from "./booking.model";
